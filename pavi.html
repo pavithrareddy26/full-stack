@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Skill Learning Academy Marketplace</title>
+<style>
+body{
+    font-family: Arial;
+    background:#f4f6f9;
+}
+.container{
+    width:600px;
+    margin:auto;
+    background:white;
+    padding:20px;
+    margin-top:40px;
+    border-radius:10px;
+    box-shadow:0 0 10px gray;
+}
+input, select, button{
+    width:100%;
+    padding:8px;
+    margin:6px 0;
+}
+button{
+    background:#007bff;
+    color:white;
+    border:none;
+    cursor:pointer;
+}
+button:hover{
+    background:#0056b3;
+}
+.hidden{
+    display:none;
+}
+.course-box{
+    border:1px solid #ddd;
+    padding:10px;
+    margin-top:10px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h2 align="center">Skill Learning Academy</h2>
+
+<!-- Register -->
+<div id="registerSection">
+<h3>Register</h3>
+<input type="text" id="regName" placeholder="Name">
+<input type="email" id="regEmail" placeholder="Email">
+<input type="password" id="regPassword" placeholder="Password">
+
+<select id="regRole">
+<option value="student">Student</option>
+<option value="instructor">Instructor</option>
+</select>
+
+<button onclick="register()">Register</button>
+<p>Already have account? <a href="#" onclick="showLogin()">Login</a></p>
+</div>
+
+<!-- Login -->
+<div id="loginSection" class="hidden">
+<h3>Login</h3>
+<input type="email" id="loginEmail" placeholder="Email">
+<input type="password" id="loginPassword" placeholder="Password">
+<button onclick="login()">Login</button>
+<p>No account? <a href="#" onclick="showRegister()">Register</a></p>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard" class="hidden">
+<h3 id="welcome"></h3>
+<button onclick="logout()">Logout</button>
+
+<div id="instructorPanel" class="hidden">
+<h4>Create Course</h4>
+<input type="text" id="courseTitle" placeholder="Course Title">
+<input type="number" id="coursePrice" placeholder="Price">
+<button onclick="createCourse()">Add Course</button>
+</div>
+
+<h4>Available Courses</h4>
+<div id="courseList"></div>
+
+<h4 id="myCoursesTitle" class="hidden">My Purchased Courses</h4>
+<div id="myCourses"></div>
+
+</div>
+
+<!-- Payment Page -->
+<div id="paymentPage" class="container hidden">
+<h3>Payment Page</h3>
+<p id="payCourseName"></p>
+<p id="payAmount"></p>
+<input type="text" id="cardNumber" placeholder="Card Number">
+<input type="text" id="cardName" placeholder="Card Holder Name">
+<input type="text" id="cvv" placeholder="CVV">
+<button onclick="processPayment()">Pay Now</button>
+</div>
+
+</div>
+
+<script>
+
+// Default Courses with Price
+let defaultCourses = [
+{title:"Full Stack Web Development", price:5000},
+{title:"Python Programming", price:3000},
+{title:"Java Programming", price:3500},
+{title:"Data Structures & Algorithms", price:4000},
+{title:"Artificial Intelligence", price:6000}
+];
+
+// Encode password
+function hashPassword(password){
+    return btoa(password);
+}
+
+function showLogin(){
+    registerSection.classList.add("hidden");
+    loginSection.classList.remove("hidden");
+}
+
+function showRegister(){
+    loginSection.classList.add("hidden");
+    registerSection.classList.remove("hidden");
+}
+
+function register(){
+    let name = regName.value;
+    let email = regEmail.value;
+    let password = hashPassword(regPassword.value);
+    let role = regRole.value;
+
+    let users = JSON.parse(localStorage.getItem("users")) || [];
+
+    if(users.find(u => u.email === email)){
+        alert("User already exists!");
+        return;
+    }
+
+    users.push({name,email,password,role,myCourses:[]});
+    localStorage.setItem("users", JSON.stringify(users));
+
+    alert("Registered Successfully!");
+    showLogin();
+}
+
+function login(){
+    let email = loginEmail.value;
+    let password = hashPassword(loginPassword.value);
+
+    let users = JSON.parse(localStorage.getItem("users")) || [];
+    let user = users.find(u => u.email === email && u.password === password);
+
+    if(!user){
+        alert("Invalid Credentials!");
+        return;
+    }
+
+    localStorage.setItem("currentUser", JSON.stringify(user));
+
+    loginSection.classList.add("hidden");
+    dashboard.classList.remove("hidden");
+
+    welcome.innerText = "Welcome " + user.name + " (" + user.role + ")";
+
+    if(user.role === "instructor"){
+        instructorPanel.classList.remove("hidden");
+    }else{
+        myCoursesTitle.classList.remove("hidden");
+        showMyCourses(user.myCourses);
+    }
+
+    loadCourses();
+}
+
+function logout(){
+    localStorage.removeItem("currentUser");
+    location.reload();
+}
+
+function createCourse(){
+    let title = courseTitle.value;
+    let price = coursePrice.value;
+
+    let courses = JSON.parse(localStorage.getItem("courses")) || [];
+
+    courses.push({title, price});
+    localStorage.setItem("courses", JSON.stringify(courses));
+
+    alert("Course Added!");
+    loadCourses();
+}
+
+function loadCourses(){
+    let courses = JSON.parse(localStorage.getItem("courses")) || [];
+    let currentUser = JSON.parse(localStorage.getItem("currentUser"));
+
+    let allCourses = defaultCourses.concat(courses);
+
+    let html = "";
+
+    allCourses.forEach((c,index)=>{
+        html += `
+        <div class="course-box">
+            <h4>${c.title}</h4>
+            <p>Price: ₹${c.price}</p>
+            ${currentUser.role === "student" ?
+            `<button onclick="enroll('${c.title}',${c.price})">Enroll & Pay</button>` : ""}
+        </div>
+        `;
+    });
+
+    courseList.innerHTML = html;
+}
+
+let selectedCourse = null;
+let selectedPrice = 0;
+
+function enroll(title,price){
+    selectedCourse = title;
+    selectedPrice = price;
+
+    dashboard.classList.add("hidden");
+    paymentPage.classList.remove("hidden");
+
+    payCourseName.innerText = "Course: " + title;
+    payAmount.innerText = "Amount to Pay: ₹" + price;
+}
+
+function processPayment(){
+    let cardNo = cardNumber.value;
+    let name = cardName.value;
+    let cvvNo = cvv.value;
+
+    if(cardNo.length < 8 || cvvNo.length < 3){
+        alert("Invalid Card Details!");
+        return;
+    }
+
+    let users = JSON.parse(localStorage.getItem("users"));
+    let currentUser = JSON.parse(localStorage.getItem("currentUser"));
+
+    let userIndex = users.findIndex(u => u.email === currentUser.email);
+
+    users[userIndex].myCourses.push(selectedCourse);
+
+    localStorage.setItem("users", JSON.stringify(users));
+    localStorage.setItem("currentUser", JSON.stringify(users[userIndex]));
+
+    alert("Payment Successful! Course Purchased.");
+
+    paymentPage.classList.add("hidden");
+    dashboard.classList.remove("hidden");
+
+    showMyCourses(users[userIndex].myCourses);
+}
+
+function showMyCourses(myCourses){
+    let html="";
+    myCourses.forEach(c=>{
+        html += `<div class="course-box">${c}</div>`;
+    });
+    myCourses.innerHTML = html;
+}
+
+</script>
+
+</body>
+</html>
